@@ -1,10 +1,10 @@
-from urlparse import urlparse, parse_qs
+import importlib
+from urllib.parse import parse_qs, urlparse
+from unittest import mock
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.utils.importlib import import_module
 from django.test import Client
-from nose import tools
-import mock
 
 from .utils import OIDCTestCase
 from oidc_auth.models import OpenIDProvider, Nonce
@@ -25,8 +25,8 @@ class TestAuthorizationPhase(OIDCTestCase):
         with oidc_settings.override(DEFAULT_PROVIDER={}):
             response = self.client.get('/oidc/login/')
 
-        tools.assert_equal(response.status_code, 200)
-        tools.assert_true(any(t.name == 'oidc/login.html' for t in response.templates))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(any(t.name == 'oidc/login.html' for t in response.templates))
 
     @mock.patch('requests.get')
     def test_post_login(self, get_mock):
@@ -37,18 +37,18 @@ class TestAuthorizationPhase(OIDCTestCase):
                 'issuer': 'http://example.it'
             })
 
-        tools.assert_equal(response.status_code, 302)
+        self.assertEqual(response.status_code, 302)
 
         redirect_url = urlparse(response['Location'])
-        tools.assert_equal('http://example.it', '%s://%s' % (redirect_url.scheme, redirect_url.hostname))
+        self.assertEqual('http://example.it', '%s://%s' % (redirect_url.scheme, redirect_url.hostname))
 
         params = parse_qs(redirect_url.query)
-        tools.assert_equal(set(params.keys()),
-            {'response_type', 'scope', 'client_id', 'state'})
+        self.assertEqual(set(params.keys()),
+            {'response_type', 'scope', 'client_id', 'state', 'redirect_uri'})
 
     def test_login_complete_without_oidc_session(self):
-        response = self.client.get('/oidc/complete')  # without oidc_state in session *on purpose*
-        tools.assert_equal(response.status_code, 301)
+        response = self.client.get('/oidc/complete/')  # without oidc_state in session *on purpose*
+        self.assertEqual(response.status_code, 403)
 
     @mock.patch('requests.get')
     def test_login_default_provider(self, get_mock):
@@ -60,9 +60,9 @@ class TestAuthorizationPhase(OIDCTestCase):
         with oidc_settings.override(DEFAULT_PROVIDER=configs):
             response = self.client.get('/oidc/login/')
 
-        tools.assert_equal(response.status_code, 302)
+        self.assertEqual(response.status_code, 302)
         redirect_url = urlparse(response['Location'])
-        tools.assert_equal('default.example.it', redirect_url.hostname)
+        self.assertEqual('default.example.it', redirect_url.hostname)
 
 
 class TestTokenExchangePhase(OIDCTestCase):
@@ -70,20 +70,21 @@ class TestTokenExchangePhase(OIDCTestCase):
         super(TestTokenExchangePhase, self).setUp()
         self.client = Client()
 
-        engine = import_module(settings.SESSION_ENGINE)
+        engine = importlib.import_module(settings.SESSION_ENGINE)
         store = engine.SessionStore()
         store.save()  
         self.client.cookies[settings.SESSION_COOKIE_NAME] = store.session_key
+        self.session_key = store.session_key
 
     def test_invalid_request(self):
         session = self.client.session
         session['oidc_state'] = 'foobar'
         session.save()
 
-        tools.assert_equal(400, self.client.post('/oidc/complete/').status_code)
-        tools.assert_equal(400, self.client.post('/oidc/complete/', data={
+        self.assertEqual(403, self.client.post('/oidc/complete/').status_code)
+        self.assertEqual(403, self.client.post('/oidc/complete/', data={
             'code': '12345'}).status_code)
-        tools.assert_equal(400, self.client.post('/oidc/complete/', data={
+        self.assertEqual(403, self.client.post('/oidc/complete/', data={
             'state': '12345'}).status_code)
 
     @mock.patch('requests.post')
@@ -100,14 +101,21 @@ class TestTokenExchangePhase(OIDCTestCase):
         post_mock.return_value = response
 
         state = 'abcde'
-        Nonce.objects.create(issuer_url='http://example.it', state=state, redirect_url='http://back.to.me')
-        provider = OpenIDProvider.objects.create(issuer='http://example.it',
-                client_id='12345',
-                client_secret='abcde',
-                token_endpoint='http://example.it/token',
-                authorization_endpoint='http://a.b/auth',
-                userinfo_endpoint='http://a.b/userinfo',
-                jwks_uri='http://a.b/jwks')
+        provider = OpenIDProvider.objects.create(
+            issuer='http://example.it',
+            client_id='12345',
+            client_secret='abcde',
+            token_endpoint='http://example.it/token',
+            authorization_endpoint='http://a.b/auth',
+            userinfo_endpoint='http://a.b/userinfo',
+            jwks_uri='http://a.b/jwks',
+        )
+        Nonce.objects.create(
+            provider_id=provider.id,
+            state=state,
+            redirect_url='http://back.to.me',
+            session_id=self.session_key,
+        )
 
         user = UserModel.objects.create(username='foobar')
 
@@ -116,17 +124,17 @@ class TestTokenExchangePhase(OIDCTestCase):
         session.save()
 
         with mock.patch.object(OpenIDProvider, 'verify_id_token') as mock_verify_id_token:
-            mock_verify_id_token.return_value = { 'sub': 'foobar' }
+            mock_verify_id_token.return_value = { 'sub': 'foobar', 'iss': provider.issuer }
 
             response = self.client.get('/oidc/complete/', data={
                 'state': state,
                 'code': '12345'
             })
 
-        post_mock.assert_called_with(provider.token_endpoint, params={
+        post_mock.assert_called_with(provider.token_endpoint, data={
             'grant_type': 'authorization_code',
             'code': '12345',
-            'redirect_uri': 'http://testserver/oidc/complete/'
+            'redirect_uri': 'http://back.to.me'
         }, auth=provider.client_credentials, verify=True)
 
     @mock.patch('requests.post')
@@ -154,14 +162,21 @@ class TestTokenExchangePhase(OIDCTestCase):
             post_mock.return_value = response
 
             state = 'abcde'
-            Nonce.objects.create(issuer_url='http://example.it', state=state, redirect_url='http://back.to.me')
-            provider = OpenIDProvider.objects.create(issuer='http://example.it',
-                    client_id='12345',
-                    client_secret='abcde',
-                    token_endpoint='http://example.it/token',
-                    authorization_endpoint='http://a.b/',
-                    userinfo_endpoint='http://a.b/',
-                    jwks_uri='http://a.b/')
+            provider = OpenIDProvider.objects.create(
+                issuer='http://example.it',
+                client_id='12345',
+                client_secret='abcde',
+                token_endpoint='http://example.it/token',
+                authorization_endpoint='http://a.b/',
+                userinfo_endpoint='http://a.b/',
+                jwks_uri='http://a.b/',
+            )
+            Nonce.objects.create(
+                provider_id=provider.id,
+                state=state,
+                redirect_url='http://back.to.me',
+                session_id=self.session_key,
+            )
 
             session = self.client.session
             session['oidc_state'] = state
@@ -170,15 +185,15 @@ class TestTokenExchangePhase(OIDCTestCase):
             user = UserModel.objects.create(username='foobar')
 
             with mock.patch.object(OpenIDProvider, 'verify_id_token') as mock_verify_id_token:
-                mock_verify_id_token.return_value = { 'sub': 'foobar' }
+                mock_verify_id_token.return_value = { 'sub': 'foobar', 'iss': provider.issuer }
 
                 response = self.client.get('/oidc/complete/', data={
                     'state': state,
                     'code': '12345'
                 })
 
-            post_mock.assert_called_with(provider.token_endpoint, params={
+            post_mock.assert_called_with(provider.token_endpoint, data={
                 'grant_type': 'authorization_code',
                 'code': '12345',
-                'redirect_uri': 'http://testserver/oidc/complete/'
+                'redirect_uri': 'http://back.to.me'
             }, auth=provider.client_credentials, verify=False)

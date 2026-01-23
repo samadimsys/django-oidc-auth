@@ -11,7 +11,7 @@ def scopes(_scopes):
 
 
 def b64decode(token):
-    token += ('=' * (len(token) % 4))
+    token += '=' * (-len(token) % 4)
     decoded = python_b64decode(token)
     return json.loads(decoded)
 

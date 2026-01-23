@@ -1,11 +1,21 @@
 from django.conf import settings
-from django.http import HttpResponseBadRequest, HttpResponseNotAllowed, HttpResponseForbidden,\
-    HttpResponseServerError
 from django.contrib.auth import REDIRECT_FIELD_NAME
-from django.core.urlresolvers import reverse
-from django.shortcuts import render, redirect
+from django.http import (
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    HttpResponseNotAllowed,
+    HttpResponseServerError,
+)
+from django.shortcuts import redirect, render
+from django.urls import reverse
 
-from .errors import *
+from .errors import (
+    ForbiddenAuthRequest,
+    InvalidIssuer,
+    InvalidUserInfo,
+    OpenIDConnectError,
+    TokenValidationError,
+)
 from .utils import log
 from .settings import oidc_settings
 from .forms import OpenIDConnectForm
@@ -27,7 +37,7 @@ def login_begin(request, template_name='oidc/login.html',
 
         return _redirect(request, login_complete_view, issuer, redirect_field_name)
 
-    log.debug('Rendering login template at %s' % template_name)
+    log.debug('Rendering login template at %s', template_name)
     return render(request, template_name)
 
 
@@ -55,7 +65,7 @@ def _redirect(request, login_complete_view, issuer, redirect_field_name):
 
     redirect_url = auth.login_init(provider, login_data, oidc_settings.SCOPES, complete_url)
 
-    log.debug('Redirecting to %s' % redirect_url)
+    log.debug('Redirecting to %s', redirect_url)
     return redirect(redirect_url)
 
 
@@ -71,9 +81,9 @@ def login_complete(request, login_complete_view='oidc-complete',
         auth = OpenIDConnectAuth(request)
         user = auth.user_login(auth.login_complete())
     except (ForbiddenAuthRequest, InvalidUserInfo, TokenValidationError) as e:
-        return HttpResponseForbidden(e.message)
+        return HttpResponseForbidden(str(e))
     except OpenIDConnectError as e:
-        return HttpResponseServerError(e.message)
+        return HttpResponseServerError(str(e))
 
     if user is None:
         return HttpResponseForbidden('Invalid user credentials')
@@ -89,5 +99,5 @@ def _redirect_to_provider(request):
     has_default_provider = oidc_settings.DEFAULT_PROVIDER
 
     return (not oidc_settings.DISABLE_OIDC
-            and (has_default_provider 
-                    or request.method == 'POST'))
+            and (has_default_provider
+                or request.method == 'POST'))

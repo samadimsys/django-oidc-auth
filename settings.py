@@ -1,97 +1,69 @@
-import django
-import logging
-django_version = django.get_version()
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent
+
+SECRET_KEY = '34958734985734985734985798437'
 
 DEBUG = True
-TEMPLATE_DEBUG = DEBUG
 
-ADMINS = (
-    # ('Your Name', 'your_email@domain.com'),
-)
+ALLOWED_HOSTS = ['*']
 
-MANAGERS = ADMINS
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    'oidc_auth.apps.OIDCAuthConfig',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+]
+
+ROOT_URLCONF = 'urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'sqlite.db'
+        'NAME': BASE_DIR / 'sqlite.db',
     }
 }
 
-# Local time zone for this installation. Choices can be found here:
-# http://www.postgresql.org/docs/8.1/static/datetime-keywords.html#DATETIME-TIMEZONE-SET-TABLE
-# although not all variations may be possible on all operating systems.
-# If running in a Windows environment this must be set to the same as your
-# system time zone.
-TIME_ZONE = 'America/Chicago'
-
-# Language code for this installation. All choices can be found here:
-# http://www.w3.org/TR/REC-html40/struct/dirlang.html#langcodes
-# http://blogs.law.harvard.edu/tech/stories/storyReader$15
 LANGUAGE_CODE = 'en-us'
 
-SITE_ID = 1
+TIME_ZONE = 'UTC'
 
-# If you set this to False, Django will make some optimizations so as not
-# to load the internationalization machinery.
 USE_I18N = True
 
-STATIC_URL = '/static/'
+USE_TZ = True
 
-# Absolute path to the directory that holds media.
-# Example: "/home/media/media.lawrence.com/"
-MEDIA_ROOT = ''
+STATIC_URL = 'static/'
 
-# URL that handles the media served from MEDIA_ROOT.
-# Example: "http://media.lawrence.com"
-MEDIA_URL = ''
-
-# URL prefix for admin media -- CSS, JavaScript and images. Make sure to use a
-# trailing slash.
-# Examples: "http://foo.com/media/", "/media/".
-ADMIN_MEDIA_PREFIX = '/media/'
-
-# Make this unique, and don't share it with anybody.
-SECRET_KEY = '34958734985734985734985798437'
-
-MIDDLEWARE_CLASSES = (
-    'django.middleware.common.CommonMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-)
-
-ROOT_URLCONF = 'urls'
-
-TEMPLATE_DIRS = (
-    # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
-    # Always use forward slashes, even on Windows.
-    # Don't forget to use absolute paths, not relative paths.
-)
-
-INSTALLED_APPS = (
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.staticfiles',
-    'django.contrib.messages',
-    'django.contrib.admin',
-    'django_nose',
-    'oidc_auth',
-)
-
-TESTABLE_APPS = (
-    'oidc_auth',
-)
-
-SKIP_TESTS = (
-    'south',
-)
-
-TEST_RUNNER = 'django_nose.NoseTestSuiteRunner'
-
-SOUTH_TESTS_MIGRATE = False
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTHENTICATION_BACKENDS = (
     'oidc_auth.auth.OpenIDConnectBackend',
@@ -99,6 +71,7 @@ AUTHENTICATION_BACKENDS = (
 )
 
 LOGIN_URL = '/oidc/login/'
+LOGIN_REDIRECT_URL = '/'
 
 OIDC_AUTH = {
     'DEFAULT_PROVIDER': {
@@ -110,8 +83,3 @@ OIDC_AUTH = {
         'client_secret': '123456'
     }
 }
-
-
-oidc_auth_log = logging.getLogger('oidc_auth')
-oidc_auth_log.setLevel(logging.DEBUG)
-# oidc_auth_log.addHandler(logging.StreamHandler())

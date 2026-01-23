@@ -2,3 +2,5 @@ django_oidc_auth.egg-info/
 dist/
 *.pyc
 sqlite.db
+.python-version
+.venv-*/

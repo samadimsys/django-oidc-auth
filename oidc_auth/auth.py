@@ -1,10 +1,14 @@
-from urllib import urlencode
+from urllib.parse import urlencode
+
 import requests
 
 from django.contrib.auth import authenticate, login
 from django.core.exceptions import PermissionDenied
+from django.contrib.auth.backends import BaseBackend
 
-from .errors import *
+from .errors import (DataError, ForbiddenAuthRequest, InvalidIdToken,
+                     InvalidIssuer, InvalidUserInfo, OpenIDConnectError,
+                     RequestError, TokenValidationError, UnsupportedSigningMethod)
 from .settings import oidc_settings
 from . import utils
 from .utils import log, import_from_str
@@ -14,7 +18,7 @@ from .models import OpenIDProvider, get_default_provider
 """
 Django Authentication backend
 """
-class OpenIDConnectBackend(object):
+class OpenIDConnectBackend(BaseBackend):
 
     def _get_user_manager(self):
         if oidc_settings.USER_MANAGER:
@@ -27,12 +31,14 @@ class OpenIDConnectBackend(object):
             return manager.get_user_by_id(user_id)
         return None
 
-    def authenticate(self, **kwargs):
+    def authenticate(self, request=None, **kwargs):
         try:
             credentials = kwargs.get('credentials')
             provider = kwargs.get('provider')
             if not credentials or not provider:
                 return None
+
+            credentials = dict(credentials)
 
             if 'id_token' in credentials:
                 #By code path
@@ -87,14 +93,14 @@ class OpenIDConnectAuth(object):
                 provider = OpenIDProvider.find(issuer=id_token['iss'])
 
             sub = id_token['sub']
-            log.debug('Requesting userinfo from %s, cli: %s, sub: %s' % (
-                provider.userinfo_endpoint, provider.client_id, sub))
+            log.debug('Requesting userinfo from %s, cli: %s, sub: %s',
+                      provider.userinfo_endpoint, provider.client_id, sub)
         else:
             if not provider:
                 raise InvalidIssuer()
             sub = None
-            log.debug('Requesting userinfo from %s, cli: %s' % (
-                provider.userinfo_endpoint, provider.client_id))
+            log.debug('Requesting userinfo from %s, cli: %s',
+                      provider.userinfo_endpoint, provider.client_id)
 
         response = requests.get(provider.userinfo_endpoint, headers={
             'Authorization': 'Bearer %s' % access_token
@@ -119,8 +125,8 @@ class OpenIDConnectAuth(object):
         return OpenIDProvider.find(**kwargs)
 
     """
-    Login initialization funtion.
-    Retunrs URL pointing to OIDC provider
+    Login initialization function.
+    Returns URL pointing to the OIDC provider.
     """
     def login_init(self, provider, login_data, scopes, complete_url):
         if oidc_settings.DISABLE_OIDC:
@@ -144,7 +150,7 @@ class OpenIDConnectAuth(object):
         })
         redirect_url = '%s?%s' % (provider.authorization_endpoint, params)
 
-        log.debug('Redirecting to %s' % redirect_url)
+        log.debug('Redirecting to %s', redirect_url)
         return redirect_url
 
     """
@@ -172,7 +178,7 @@ class OpenIDConnectAuth(object):
 
         self.login_data = nonce.state_data
         self.provider = OpenIDProvider.find(id=nonce.provider_id)
-        log.debug('Login started from provider %d' % self.provider.id)
+        log.debug('Login started from provider %d', self.provider.id)
 
         params = {
             'grant_type': 'authorization_code',
@@ -185,7 +191,7 @@ class OpenIDConnectAuth(object):
                              data=params, verify=oidc_settings.VERIFY_SSL)
 
         if response.status_code != 200:
-            log.debug('Token request failed %d' % response.status_code)
+            log.debug('Token request failed %d', response.status_code)
             raise RequestError(self.provider.token_endpoint, response.status_code)
 
         log.debug('Token exchange done, proceeding authentication')
@@ -198,11 +204,11 @@ class OpenIDConnectAuth(object):
     Returns user
     """
     def user_login(self, credentials, login_data=None):
-        user = authenticate(credentials=credentials, provider=self.provider, login_data=login_data)
+        user = authenticate(self.request, credentials=credentials, provider=self.provider, login_data=login_data)
         if user is None:
             return None
 
-        if user.is_authenticated():
+        if user.is_authenticated:
             login(self.request, user)
 
         return user

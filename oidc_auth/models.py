@@ -1,12 +1,12 @@
-import string
 import random
-from urlparse import urljoin
+import string
+from urllib.parse import urljoin
+
 import requests
-from django.db import models, IntegrityError
 from django.core.exceptions import ValidationError
-from jwkest.jwk import load_jwks_from_url
+from django.db import IntegrityError, models
+from jwkest.jwk import SYMKey, load_jwks_from_url
 from jwkest.jws import JWS
-from jwkest.jwk import SYMKey
 
 from . import errors
 from .settings import oidc_settings
@@ -21,17 +21,14 @@ class Nonce(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     state_data = models.CharField(max_length=255, null=True, blank=True)
 
-    def __unicode__(self):
-        return '%s' % self.state
-
-    def __init__(self, *args, **kwargs):
-        super(Nonce, self).__init__(*args, **kwargs)
+    def __str__(self):
+        return str(self.state)
 
     @staticmethod
     def nonce(length=oidc_settings.NONCE_LENGTH):
         """Generate nonce string"""
-        CHARS = string.letters + string.digits
-        return ''.join(random.choice(CHARS) for n in range(length))
+        chars = string.ascii_letters + string.digits
+        return ''.join(random.choice(chars) for _ in range(length))
 
     @classmethod
     def generate(cls, request, session_id, redirect_url, provider_id, nonce=None, state_data=None):
@@ -40,7 +37,7 @@ class Nonce(models.Model):
         try:
             obj = cls(provider_id=provider_id, state=state,
                     session_id=session_id, redirect_url=redirect_url, state_data=state_data)
-            """Validate size constraints because DB may silently trim values"""
+            # Ensure DB constraints are respected before saving
             obj.clean_fields()
             obj.save(force_insert=True)
             return state
@@ -80,14 +77,14 @@ class OpenIDProvider(models.Model):
     class Meta:
         unique_together = (('issuer', 'client_id'), )
 
-    def __unicode__(self):
+    def __str__(self):
         return "".join(["iss: ", self.issuer, ", client: ", self.client_id])
 
     @classmethod
     def find(cls, **kwargs):
         try:
             keymap = {'id': 'id', 'issuer': 'issuer', 'client': 'client_id'}
-            flt = {keymap[k]: v for k,v in kwargs.items()}
+            flt = {keymap[k]: v for k, v in kwargs.items()}
             provider = cls.objects.get(**flt)
             return provider
         except cls.DoesNotExist:
@@ -96,10 +93,12 @@ class OpenIDProvider(models.Model):
             raise errors.InvalidIssuer("Provider is not specified")
 
     @classmethod
-    def discover(cls, issuer='', credentials={}, save=True):
+    def discover(cls, issuer='', credentials=None, save=True):
         """Returns a known OIDC Endpoint. If it doesn't exist in the database,
         then it'll fetch its data according to OpenID Connect Discovery spec.
         """
+        credentials = credentials or {}
+
         if not (issuer or credentials):
             raise ValueError('You should provide either an issuer or credentials')
 
@@ -108,7 +107,7 @@ class OpenIDProvider(models.Model):
 
         try:
             provider = cls.objects.get(issuer=issuer)
-            log.debug('Provider %s already discovered' % issuer)
+            log.debug('Provider %s already discovered', issuer)
             return provider
         except cls.DoesNotExist:
             pass
@@ -118,7 +117,7 @@ class OpenIDProvider(models.Model):
         if oidc_settings.DISABLE_OIDC_DISCOVER:
             raise errors.InvalidIssuer()
 
-        log.debug('Provider %s not discovered yet, proceeding discovery' % issuer)
+        log.debug('Provider %s not discovered yet, proceeding discovery', issuer)
         discover_endpoint = urljoin(issuer, '.well-known/openid-configuration')
         response = requests.get(discover_endpoint, verify=oidc_settings.VERIFY_SSL)
 
@@ -137,7 +136,7 @@ class OpenIDProvider(models.Model):
         if save:
             provider.save()
 
-        log.debug('Provider %s succesfully discovered' % issuer)
+        log.debug('Provider %s succesfully discovered', issuer)
         return provider
 
     @property
@@ -153,7 +152,7 @@ class OpenIDProvider(models.Model):
         return [SYMKey(key=str(self.client_secret))]
 
     def verify_id_token(self, token):
-        log.debug('Verifying token %s' % token)
+        log.debug('Verifying token %s', token)
         header, claims, signature = token.split('.')
         header = b64decode(header)
         claims = b64decode(claims)
@@ -165,7 +164,7 @@ class OpenIDProvider(models.Model):
             raise errors.UnsupportedSigningMethod(header['alg'], ['HS256', 'RS256'])
 
         id_token = JWS().verify_compact(token, self.signing_keys)
-        log.debug('Token verified, %s' % id_token)
+        log.debug('Token verified, %s', id_token)
         return id_token
 
     @staticmethod

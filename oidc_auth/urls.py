@@ -1,7 +1,9 @@
-from django.conf.urls import patterns, url
+from django.urls import path
+
+from oidc_auth import views
 
 
-urlpatterns = patterns('oidc_auth.views',
-    url(r'^login/$', 'login_begin', name='oidc-login'),
-    url(r'^complete/$', 'login_complete', name='oidc-complete'),
-)
+urlpatterns = [
+    path('login/', views.login_begin, name='oidc-login'),
+    path('complete/', views.login_complete, name='oidc-complete'),
+]

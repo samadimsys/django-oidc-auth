@@ -21,20 +21,20 @@ class Migration(migrations.Migration):
                 ('redirect_url', models.CharField(max_length=100)),
             ],
         ),
-        migrations.CreateModel(
-            name='OpenIDProvider',
-            fields=[
-                ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('issuer', models.URLField(unique=True)),
-                ('authorization_endpoint', models.URLField()),
-                ('token_endpoint', models.URLField()),
-                ('userinfo_endpoint', models.URLField()),
-                ('jwks_uri', models.URLField(null=True, blank=True)),
-                ('signing_alg', models.CharField(default=b'HS256', max_length=5, choices=[(b'RS256', b'RS256'), (b'HS256', b'HS256')])),
-                ('client_id', models.CharField(max_length=255)),
-                ('client_secret', models.CharField(max_length=255)),
-            ],
-        ),
+            migrations.CreateModel(
+                name='OpenIDProvider',
+                fields=[
+                    ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
+                    ('issuer', models.URLField(unique=True)),
+                    ('authorization_endpoint', models.URLField()),
+                    ('token_endpoint', models.URLField()),
+                    ('userinfo_endpoint', models.URLField()),
+                    ('jwks_uri', models.URLField(null=True, blank=True)),
+                    ('signing_alg', models.CharField(default='HS256', max_length=5, choices=[('RS256', 'RS256'), ('HS256', 'HS256')])),
+                    ('client_id', models.CharField(max_length=255)),
+                    ('client_secret', models.CharField(max_length=255)),
+                ],
+            ),
         migrations.CreateModel(
             name='OpenIDUser',
             fields=[
@@ -42,8 +42,8 @@ class Migration(migrations.Migration):
                 ('sub', models.CharField(unique=True, max_length=255)),
                 ('access_token', models.CharField(max_length=255)),
                 ('refresh_token', models.CharField(max_length=255)),
-                ('issuer', models.ForeignKey(to='oidc_auth.OpenIDProvider')),
-                ('user', models.OneToOneField(related_name='oidc_account', to=settings.AUTH_USER_MODEL)),
+                ('issuer', models.ForeignKey(on_delete=models.CASCADE, to='oidc_auth.OpenIDProvider')),
+                ('user', models.OneToOneField(on_delete=models.CASCADE, related_name='oidc_account', to=settings.AUTH_USER_MODEL)),
             ],
         ),
     ]

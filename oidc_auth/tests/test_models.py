@@ -1,6 +1,5 @@
-from urlparse import urljoin
-import mock
-from nose import tools
+from urllib.parse import urljoin
+from unittest import mock
 
 from .utils import OIDCTestCase
 from oidc_auth.models import OpenIDProvider, get_default_provider
@@ -34,12 +33,12 @@ class TestOpenIDPRovider(OIDCTestCase):
 
     @mock.patch('requests.get')
     def test_discover_existing_provider(self, get_mock):
-        existing_provider = OpenIDProvider.objects.create(issuer='http://example.it')
+        existing_provider = OpenIDProvider.objects.create(**self.configs)
         get_mock.return_value = self.response_mock
 
         found_provider = OpenIDProvider.discover(issuer='http://example.it')
 
-        tools.assert_equal(found_provider.id, existing_provider.id)
+        self.assertEqual(found_provider.id, existing_provider.id)
 
     @mock.patch('oidc_auth.models.OpenIDProvider')
     def test_get_default_provider__create(self, ProviderMock):
@@ -50,7 +49,7 @@ class TestOpenIDPRovider(OIDCTestCase):
             got_provider = get_default_provider()
 
         self.assertIs(provider, got_provider)
-        assert not ProviderMock.save.called, 'Save should not have been called!'
+        self.assertFalse(ProviderMock.save.called, 'Save should not have been called!')
 
     @mock.patch('oidc_auth.models.OpenIDProvider')
     def test_get_default_provider__no_updates(self, ProviderMock):
@@ -61,7 +60,7 @@ class TestOpenIDPRovider(OIDCTestCase):
             got_provider = get_default_provider()
 
         self.assertIs(provider, got_provider)
-        assert not ProviderMock.save.called, 'Save should not have been called!'
+        self.assertFalse(ProviderMock.save.called, 'Save should not have been called!')
 
     @mock.patch('oidc_auth.models.OpenIDProvider')
     def test_get_default_provider__with_updates(self, ProviderMock):
@@ -80,7 +79,8 @@ class TestOpenIDPRovider(OIDCTestCase):
         self.assertEqual(old_provider.authorization_endpoint, new_url)
 
     def create_bogus_object(self, update_args=None):
-        class Foo(object): pass
+        class Foo(object):
+            pass
         foo = Foo()
 
         if update_args:

@@ -8,7 +8,7 @@ class OpenIDConnectError(RuntimeError):
             message = getattr(self, 'message', '')
 
         log.error(message)
-        super(OpenIDConnectError, self).__init__(message)
+        super().__init__(message)
 
 
 class InvalidIdToken(OpenIDConnectError, ValueError):
@@ -20,23 +20,23 @@ class TokenValidationError(OpenIDConnectError, ValueError):
     code = 401
     def __init__(self, name):
         message = 'Token validation %s failed' % name
-        super(TokenValidationError, self).__init__(message)
+        super().__init__(message)
 
 
 class UnsupportedSigningMethod(OpenIDConnectError, ValueError):
     code = 500
     def __init__(self, unsupported_method, supported_methods):
         message = 'Signing method %s not supported, options are (%s)' % (
-                unsupported_method, ', '.join(supported_methods))
-
-        super(UnsupportedSigningMethod, self).__init__(message)
+            unsupported_method, ', '.join(supported_methods)
+        )
+        super().__init__(message)
 
 
 class RequestError(OpenIDConnectError):
     code = 500
     def __init__(self, url, status_code):
         message = 'GET %s returned %s status code (200 expected)' % (url, status_code)
-        super(RequestError, self).__init__(message)
+        super().__init__(message)
 
 
 class InvalidUserInfo(OpenIDConnectError):

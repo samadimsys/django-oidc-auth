@@ -42,8 +42,11 @@ class OIDCSettings(object):
 
     @contextmanager
     def override(self, **kwargs):
+        previous = self.patched_settings
         self.patched_settings = kwargs
-        yield
-        self.patched_settings = {}
+        try:
+            yield
+        finally:
+            self.patched_settings = previous
 
 oidc_settings = OIDCSettings(USER_SETTINGS, DEFAULTS)
