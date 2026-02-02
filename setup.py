@@ -13,7 +13,7 @@ setup(
     include_package_data=True,
     python_requires='>=3.10',
     install_requires=[
-        'Django>=4.2,<4.3',
+        'Django>=5.2,<5.3',
         'pyjwkest>=1.4.2,<1.5',
         'requests>=2.31.0,<3',
     ],

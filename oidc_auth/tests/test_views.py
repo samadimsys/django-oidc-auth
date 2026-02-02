@@ -4,7 +4,7 @@ from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.test import Client
+from django.test import Client, override_settings
 
 from .utils import OIDCTestCase
 from oidc_auth.models import OpenIDProvider, Nonce
@@ -13,6 +13,7 @@ from oidc_auth.settings import oidc_settings
 UserModel = get_user_model()
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class TestAuthorizationPhase(OIDCTestCase):
     def setUp(self):
         super(TestAuthorizationPhase, self).setUp()
@@ -65,6 +66,7 @@ class TestAuthorizationPhase(OIDCTestCase):
         self.assertEqual('default.example.it', redirect_url.hostname)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class TestTokenExchangePhase(OIDCTestCase):
     def setUp(self):
         super(TestTokenExchangePhase, self).setUp()
